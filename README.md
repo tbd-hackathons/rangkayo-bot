@@ -1,4 +1,6 @@
-# Steady Beta with a Brake
+# Rangkayo bot
+
+Strategy: steady beta with a brake.
 
 An entry for [builderr Trading, Round 2](https://builderr.ai/trading-v0). Forked from the
 [builderr starter template](https://github.com/builderr-ai/builderr-trading-template) (MIT).

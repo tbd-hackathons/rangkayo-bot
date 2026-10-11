@@ -1,4 +1,4 @@
-"""Steady Beta with a Brake — builderr Trading Round 2 entry.
+"""Rangkayo bot — builderr Trading Round 2 entry (strategy: steady beta with a brake).
 
 One sentence: hold a fixed, diversified book of big US index and chip ETFs at
 about 1.35x market exposure, keep holding through small wobbles, drop only the
