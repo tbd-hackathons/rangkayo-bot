@@ -1,8 +1,7 @@
 """Rangkayo bot — builderr Trading Round 2 entry (strategy: steady beta with a brake).
 
 One sentence: hold a fixed, diversified book of big US index and chip ETFs at
-about 1.35x market exposure, keep holding through small wobbles, drop only the
-leveraged slice when the trend weakens, and go to cash when the market breaks.
+about 1.35x market exposure, and go to cash only when the market really breaks.
 
 Why this shape, for a short forward window (about 14 sessions, mid to late
 October 2026):
@@ -10,14 +9,14 @@ October 2026):
     exposure it holds, not from which names it picked. Picking and switching
     also cost slippage and whipsaw.
   * The Round 1 winner lost money in Round 2 mainly by stepping to cash on dips
-    and missing the rebounds. This bot changes state rarely: the 1x core stays
-    on unless a real break happens.
-  * The only lever is a 20% TQQQ slice (counts 3x), held only in a calm uptrend.
+    and missing the rebounds. This bot has two states and changes them rarely.
+  * ETFs only. Back-tests of single-stock pickers on today's mega-cap list look
+    great because that list is made of past winners (survivorship bias).
 
 The book (fractions of equity):
-  ON       QQQ 25%, SMH 25%, SPY 25%, TQQQ 20%  -> beta-adjusted gross 1.35x
-  STEADY   QQQ 25%, SMH 25%, SPY 25%            -> 0.75x (trend wobbling)
-  CASH     nothing                               (sharp drop, high vol, or broken trend)
+  INVESTED  QQQ 25%, SMH 25%, SPY 25%, TQQQ 20%  -> beta-adjusted gross 1.35x
+  CASH      nothing  (QQQ down 5% in 5 days, QQQ 20-day vol above 40%,
+                      or QQQ more than 3% below its 50-day average)
 
 Design limits (by construction):
   * Long-only, no borrowing; buys never exceed cash minus a 1.5% buffer.
@@ -40,8 +39,7 @@ BETA = {
     "QLD": 2.0, "SSO": 2.0, "DDM": 2.0, "ROM": 2.0, "UWM": 2.0, "AGQ": 2.0,
 }
 
-TREND_SMA = 50        # trend line for QQQ and SPY
-VOL_ON_MAX = 0.30     # QQQ 20-day annualized vol must be below this to hold TQQQ
+TREND_SMA = 50        # QQQ trend line
 VOL_BRAKE = 0.40      # above this -> cash
 DROP_BRAKE = -0.05    # QQQ 5-day return at or below -5% -> cash
 BREAK_BRAKE = 0.97    # QQQ more than 3% below its 50-day average -> cash
@@ -75,16 +73,14 @@ def _vol(c, n):
 
 
 def regime(market_state):
-    """CASH, STEADY or ON, from QQQ and SPY daily closes only."""
+    """INVESTED or CASH, from QQQ daily closes (SPY must also have history)."""
     q, s = _closes(market_state, "QQQ"), _closes(market_state, "SPY")
     if len(q) < MIN_BARS or len(s) < MIN_BARS:
         return "CASH"
-    q_sma, s_sma, vol20 = _sma(q, TREND_SMA), _sma(s, TREND_SMA), _vol(q, 20)
+    q_sma, vol20 = _sma(q, TREND_SMA), _vol(q, 20)
     if vol20 > VOL_BRAKE or q[-1] / q[-6] - 1 <= DROP_BRAKE or q[-1] < BREAK_BRAKE * q_sma:
         return "CASH"
-    if q[-1] > q_sma and s[-1] > s_sma and vol20 < VOL_ON_MAX:
-        return "ON"
-    return "STEADY"
+    return "INVESTED"
 
 
 def targets(market_state):
@@ -92,12 +88,11 @@ def targets(market_state):
     if state == "CASH":
         return state, {}
     out = {t: w for t, w in CORE.items() if len(_closes(market_state, t)) >= MIN_BARS}
-    if state == "ON":
-        for sleeve in (SLEEVE, SLEEVE_FALLBACK):
-            t, w = next(iter(sleeve.items()))
-            if len(_closes(market_state, t)) >= MIN_BARS:
-                out[t] = w
-                break
+    for sleeve in (SLEEVE, SLEEVE_FALLBACK):
+        t, w = next(iter(sleeve.items()))
+        if len(_closes(market_state, t)) >= MIN_BARS:
+            out[t] = w
+            break
     return state, out
 
 
